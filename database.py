@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 
 class Database:
     def __init__(self):
-        self.client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv("MONGO_URI", ""))
+        self.client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv("MONGO_URI", "mongodb+srv://bikash:bikash@bikash.3jkvhp7.mongodb.net/?retryWrites=true&w=majority"))
         self.db = self.client.subtitle_bot
         self.users = self.db.users
         self.admins = self.db.admins
