@@ -81,7 +81,7 @@ Welcome to **Subtitle_Muxer_Bot** — your all-in-one, powerful automation bot f
 
 We welcome contributions! Open issues, fork & PR, or just star ⭐️ the repo if you find it useful.
 
-**License:** [Apache 2.0](LICENSE)  
+**License:** [MIT](LICENSE)  
 **Maintained by:** [ChronosBots](https://github.com/ChronosBots)
 
 ---
