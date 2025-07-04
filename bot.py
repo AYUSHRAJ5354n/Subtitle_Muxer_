@@ -816,7 +816,7 @@ async def start_download_worker():
                         # 2. Perform a targeted cleanup that only affects the failed task's resources.
                         #    - Clean up the temp directory for this specific task.
                         #    - Only remove the user's state from `user_states` if it matches this failed task's ID.
-
+                        await task_manager.update_task(task_id, status="failed")
                         await task.data['status_message'].edit_text(
                             f"❌ Download of `{task.file_name}` failed. Please try again. (Task ID: {task_id})"
                         )
@@ -904,7 +904,7 @@ async def handle_upload_task(task_id: str):
         logger.warning(f"handle_upload_task: Task {task_id} not found for upload.")
         return
     
-    # FIX: Use a try...finally block to guarantee cleanup
+    # FIX: Use a try...finally block to guarantee cleanup of all temporary files and user state.
     try:
         await task.data['status_message'].edit_text(f"📤 **Preparing to Upload:** `{task.file_name}`")
         
@@ -933,6 +933,7 @@ async def handle_upload_task(task_id: str):
         if video_upload_success:
             await task.data['status_message'].delete()
         else:
+            await task_manager.update_task(task_id, status="upload_failed")
             await task.data['status_message'].edit_text(f"❌ **Upload Failed:** `{task.file_name}`")
             # Log any exceptions that occurred
             for res in results:
@@ -987,7 +988,7 @@ async def generate_and_send_screenshots(task_id: str):
         raise
 
 async def cleanup_task_files_by_user_state(user_id: int):
-    """Cleanup based on user_states entry."""
+    """Cleanup based on user_states entry. Typically used for explicit cancellation."""
     if user_id in user_states:
         state = user_states[user_id]
         
@@ -1006,7 +1007,7 @@ async def cleanup_task_files_by_user_state(user_id: int):
         del user_states[user_id]
 
 async def cleanup_task_files(task_id: str):
-    """Master cleanup function based on a task_id."""
+    """Master cleanup function based on a task_id. Called after any terminal state."""
     try:
         task = await task_manager.get_task(task_id)
         if not task:
