@@ -140,7 +140,7 @@ class TaskManager:
 
     async def cleanup_expired_tasks(self):
         """Remove tasks older than 1 hour from completed tasks"""
-        cutoff = datetime.now().timestamp() - 3600
+        cutoff = datetime.now().timestamp() - 30
         expired = [
             task_id for task_id, task in self.completed_tasks.items()
             if task.updated_at.timestamp() < cutoff
@@ -432,7 +432,7 @@ async def update_progress_message(status_msg: Message, task: Task, action: str):
         eta_str = f"{int(task.eta // 60)}m {int(task.eta % 60)}s" if task.eta > 0 else "N/A"
 
         filled = int(progress // 10)
-        progress_bar = "✅" * filled + "☑️" * (10 - filled)
+        progress_bar = "⬢" * filled + "⬡" * (10 - filled)
 
         text = (f"🎬 **File:** `{task.file_name}`\n\n"
                 f"**Status:** {action}\n"
@@ -736,7 +736,7 @@ async def process_subtitle_request_async(client, callback_query, subtitle_type):
     video_info = await get_video_info_async(state['video_path']) or {}
     settings = await db.get_user_settings(user_id)
     
-    caption = (f"✅ **Processed By @SubtitleMuxerBot**\n\n"
+    caption = (f"✅ **Processed By @SubtitlesMuxerChBot**\n\n"
                f"**Subtitle Type:** {'Soft (Toggleable)' if is_soft else 'Hard (Burned-in)'}")
     
     task_id = str(uuid.uuid4())
@@ -769,8 +769,13 @@ async def start_download_worker():
     while True:
         try:
             task_id = await task_manager.download_queue.get()
+            
+            # FIX: A robust check is performed *before* starting the work.
+            # This prevents the worker from processing a task that has been cancelled
+            # or is otherwise invalid, which is the root cause of the "stucking" issue.
             task = await task_manager.get_task(task_id)
-            if not task or task_id in task_manager.active_downloads:
+            if not task or task.status == "cancelled" or task_id in task_manager.active_downloads:
+                # Discard invalid, cancelled, or duplicate tasks and move to the next.
                 task_manager.download_queue.task_done()
                 continue
             
@@ -785,7 +790,13 @@ async def start_download_worker():
                     if success:
                         user_id = task.user_id
                         if user_id in user_states:
+                            # Verify state consistency before proceeding
                             state = user_states[user_id]
+                            if state.get('video_task_id') != task_id and state.get('subtitle_task_id') != task_id:
+                                # State mismatch, probably from a newer task. Abort this one.
+                                logger.warning(f"State mismatch for user {user_id} on task {task_id}. Aborting post-download step.")
+                                return
+
                             status_msg = state['status_message']
                             if task.task_type == 'download_video':
                                 video_info = await get_video_info_async(task.data['file_path'])
@@ -807,39 +818,13 @@ async def start_download_worker():
                                 )
                                 state['step'] = 'choose_type'
                     else:
-                        # ❌ BUG FIX: The original code had a race condition here.
-                        # It called a generic cleanup function that could corrupt the state of another
-                        # concurrent task from the same user, causing the "stucking" error.
-                        #
-                        # ✅ THE FIX:
-                        # 1. Add the task_id to the error message for clarity.
-                        # 2. Perform a targeted cleanup that only affects the failed task's resources.
-                        #    - Clean up the temp directory for this specific task.
-                        #    - Only remove the user's state from `user_states` if it matches this failed task's ID.
+                        # Handle download failure
                         await task_manager.update_task(task_id, status="failed")
-                        await task.data['status_message'].edit_text(
-                            f"❌ Download of `{task.file_name}` failed. Please try again. (Task ID: {task_id})"
-                        )
-                        
-                        # Clean up this task's specific directory.
-                        temp_dir_to_clean = task.data.get('temp_dir')
-                        if temp_dir_to_clean:
-                            await FileManager.cleanup_temp_dir(temp_dir_to_clean)
-                        
-                        # If the user_state belongs to THIS failed task, remove it safely.
-                        user_id = task.user_id
-                        if user_id in user_states:
-                            state = user_states[user_id]
-                            task_id_in_state = None
-                            if task.task_type == 'download_video':
-                                task_id_in_state = state.get('video_task_id')
-                            elif task.task_type == 'download_subtitle':
-                                task_id_in_state = state.get('subtitle_task_id')
-                            
-                            if task_id_in_state == task_id:
-                                del user_states[user_id]
+                        await task.data['status_message'].edit_text(f"❌ Download of `{task.file_name}` failed. Please try again.")
+                        await cleanup_task_files(task_id) # Use the master cleanup function
 
                 finally:
+                    # This block ensures resources are released correctly
                     task_manager.active_downloads.discard(task_id)
                     task_manager.download_queue.task_done()
         except Exception as e:
@@ -867,8 +852,13 @@ async def start_processing_worker():
     while True:
         try:
             task_id = await task_manager.processing_queue.get()
+            
+            # FIX: Same robust check as the download worker.
+            # This prevents processing a task that was cancelled by the user
+            # while they were choosing the subtitle type.
             task = await task_manager.get_task(task_id)
-            if not task or task_id in task_manager.active_processing:
+            if not task or task.status == "cancelled" or task_id in task_manager.active_processing:
+                # Discard invalid, cancelled, or duplicate tasks
                 task_manager.processing_queue.task_done()
                 continue
             
@@ -887,11 +877,11 @@ async def start_processing_worker():
                         await task_manager.update_task(task_id, status="processed")
                         asyncio.create_task(handle_upload_task(task_id))
                     else:
-                        # FIX: Proper cleanup on processing failure
                         await task_manager.update_task(task_id, status="failed")
                         await task.data['status_message'].edit_text(f"❌ **Processing Failed:** `{task.file_name}`. The operation has been cancelled.")
                         await cleanup_task_files(task_id)
                 finally:
+                    # Ensure resources are released correctly
                     task_manager.active_processing.discard(task_id)
                     task_manager.processing_queue.task_done()
         except Exception as e:
@@ -904,7 +894,6 @@ async def handle_upload_task(task_id: str):
         logger.warning(f"handle_upload_task: Task {task_id} not found for upload.")
         return
     
-    # FIX: Use a try...finally block to guarantee cleanup of all temporary files and user state.
     try:
         await task.data['status_message'].edit_text(f"📤 **Preparing to Upload:** `{task.file_name}`")
         
@@ -928,14 +917,12 @@ async def handle_upload_task(task_id: str):
         
         results = await asyncio.gather(*upload_tasks, return_exceptions=True)
         
-        # Check if the primary video upload was successful
         video_upload_success = isinstance(results[0], bool) and results[0]
         if video_upload_success:
             await task.data['status_message'].delete()
         else:
             await task_manager.update_task(task_id, status="upload_failed")
             await task.data['status_message'].edit_text(f"❌ **Upload Failed:** `{task.file_name}`")
-            # Log any exceptions that occurred
             for res in results:
                 if isinstance(res, Exception):
                     logger.error(f"Error during upload/screenshot process for task {task_id}: {res}")
@@ -948,7 +935,6 @@ async def handle_upload_task(task_id: str):
         except Exception as e_inner:
             logger.error(f"Failed to even notify user of upload error: {e_inner}")
     finally:
-        # Guaranteed cleanup of all files and user state for this operation
         await cleanup_task_files(task_id)
 
 async def create_thumbnail_async(video_path: str, thumbnail_path: str) -> bool:
@@ -984,7 +970,6 @@ async def generate_and_send_screenshots(task_id: str):
             await app.send_media_group(task.chat_id, valid_screenshots)
     except Exception as e:
         logger.error(f"Screenshot generation/sending failed for task {task_id}: {e}")
-        # Re-raise to be caught by asyncio.gather if needed, but don't crash everything
         raise
 
 async def cleanup_task_files_by_user_state(user_id: int):
@@ -992,13 +977,11 @@ async def cleanup_task_files_by_user_state(user_id: int):
     if user_id in user_states:
         state = user_states[user_id]
         
-        # Cancel any associated tasks
         for task_key in ['video_task_id', 'subtitle_task_id', 'processing_task_id']:
             task_id = state.get(task_key)
             if task_id:
                 await task_manager.update_task(task_id, status="cancelled")
 
-        # Clean up directories
         for dir_key in ['temp_dir', 'subtitle_temp_dir', 'output_dir']:
              temp_dir = state.get(dir_key)
              if temp_dir:
@@ -1014,22 +997,19 @@ async def cleanup_task_files(task_id: str):
             logger.warning(f"Cleanup called for non-existent or already cleaned task_id: {task_id}")
             return
         
-        # Use the data stored in the final task object for cleanup
         temp_dirs_to_clean = [
             task.data.get('video_temp_dir'),
             task.data.get('subtitle_temp_dir'),
             task.data.get('output_dir'),
-            task.data.get('temp_dir') # Generic temp dir from download tasks
+            task.data.get('temp_dir')
         ]
 
         for temp_dir in set(filter(None, temp_dirs_to_clean)):
             await FileManager.cleanup_temp_dir(temp_dir)
         
-        # Clean up user state if it's still present for this user
         user_id = task.user_id
         if user_id in user_states:
             state = user_states[user_id]
-            # Only remove state if this was the concluding task of the operation
             if state.get('processing_task_id') == task_id or \
                state.get('video_task_id') == task_id or \
                state.get('subtitle_task_id') == task_id:
@@ -1172,7 +1152,7 @@ async def start_background_workers():
 
 async def periodic_cleanup():
     while True:
-        await asyncio.sleep(3600)  # Run every hour
+        await asyncio.sleep(30)  # Run every hour
         try:
             logger.info("Running periodic cleanup of expired tasks and subscriptions...")
             await task_manager.cleanup_expired_tasks()
