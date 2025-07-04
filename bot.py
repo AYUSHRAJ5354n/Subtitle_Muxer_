@@ -38,11 +38,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Bot configuration
-API_ID = int(os.getenv("API_ID", ""))
-API_HASH = os.getenv("API_HASH", "")
+API_ID = int(os.getenv("API_ID", "24306431"))
+API_HASH = os.getenv("API_HASH", "697764b557544a35955b179949065741")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-MONGO_URI = os.getenv("MONGO_URI", "")
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split()))
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://bikash:bikash@bikash.3jkvhp7.mongodb.net/?retryWrites=true&w=majority")
+ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "5212197608 1685470205").split()))
 
 # Validate environment variables
 if not all([API_ID, API_HASH, BOT_TOKEN, MONGO_URI]):
