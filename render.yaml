@@ -1,0 +1,33 @@
+# render.yaml - Deploys both a web service and a worker
+
+services:
+  # 1. The Web Service for the status page
+  - name: subtitle-bot-web
+    type: web
+    runtime: docker # Use the same Dockerfile
+    # Command to start the web server using gunicorn
+    startCommand: "gunicorn web:app --bind 0.0.0.0:$PORT"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
+
+  # 2. The Background Worker for the actual bot
+  - name: subtitle-bot-worker
+    type: worker
+    runtime: docker # Use the same Dockerfile
+    # Command to start the bot
+    startCommand: "python bot.py"
+    envVars:
+      - key: API_ID
+        fromSecret: true
+      - key: API_HASH
+        fromSecret: true
+      - key: BOT_TOKEN
+        fromSecret: true
+      - key: MONGO_URI
+        fromSecret: true
+      - key: ADMIN_IDS
+        fromSecret: true
+      - key: PYTHONUNBUFFERED
+        value: 1
