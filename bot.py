@@ -38,11 +38,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Bot configuration
-API_ID = int(os.getenv("API_ID", "4857766"))
-API_HASH = os.getenv("API_HASH", "6c3c6facf5598a4b318e138f8c407028")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8013968603:AAGQeNt3DlBZczSZ_d8q4SqdnVDsgFA7YDc")
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://hello:hello@cluster0.vc2htx0.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "7361945688").split()))
+API_ID = int(os.getenv("API_ID", ""))
+API_HASH = os.getenv("API_HASH", "")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+MONGO_URI = os.getenv("MONGO_URI", "")
+ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split()))
 
 # Validate environment variables
 if not all([API_ID, API_HASH, BOT_TOKEN, MONGO_URI]):
