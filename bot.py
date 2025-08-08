@@ -736,7 +736,7 @@ async def process_subtitle_request_async(client, callback_query, subtitle_type):
     video_info = await get_video_info_async(state['video_path']) or {}
     settings = await db.get_user_settings(user_id)
     
-    caption = (f"✅ **Processed By @AYU_Bot**\n\n"
+    caption = (f"✅ **Processed By @AYU_Bots**\n\n"
                f"**Subtitle Type:** {'Soft (Toggleable)' if is_soft else 'Hard (Burned-in)'}")
     
     task_id = str(uuid.uuid4())
