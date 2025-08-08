@@ -38,11 +38,11 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Bot configuration
-API_ID = int(os.getenv("API_ID", ""))
-API_HASH = os.getenv("API_HASH", "")
+API_ID = int(os.getenv("API_ID", "28429143"))
+API_HASH = os.getenv("API_HASH", "15afc60d067490eee8d34112487ac829")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-MONGO_URI = os.getenv("MONGO_URI", "")
-ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "").split()))
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://AK:AK@cluster0.cyzlldq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
+ADMIN_IDS = list(map(int, os.getenv("ADMIN_IDS", "1685470205").split()))
 
 # Validate environment variables
 if not all([API_ID, API_HASH, BOT_TOKEN, MONGO_URI]):
@@ -54,7 +54,7 @@ MAX_CONCURRENT_PROCESSING = int(os.getenv("MAX_CONCURRENT_PROCESSING", "100"))
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1048576"))  # 1MB chunks
 CALLBACK_QUERY_TIMEOUT = int(os.getenv("CALLBACK_TIMEOUT", "300"))
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", "300"))
-FREE_USER_DAILY_LIMIT = 10  # Daily task limit for free users
+FREE_USER_DAILY_LIMIT = 3  # Daily task limit for free users
 
 # Initialize bot
 app = Client(
@@ -391,7 +391,7 @@ async def handle_file(client, message):
     is_paid = await db.is_user_paid(user_id)
 
     if not is_paid and len(user_tasks) >= 4:
-        await message.reply_text("❌ Free users can have maximum 4 concurrent tasks. Please wait for current tasks to complete or upgrade to paid plan.")
+        await message.reply_text("❌ Free users can have maximum 3 concurrent tasks. Please wait for current tasks to complete or upgrade to paid plan.")
         return
 
     file_obj = message.document or message.video
@@ -736,7 +736,7 @@ async def process_subtitle_request_async(client, callback_query, subtitle_type):
     video_info = await get_video_info_async(state['video_path']) or {}
     settings = await db.get_user_settings(user_id)
     
-    caption = (f"✅ **Processed By @SubtitlesMuxerChBot**\n\n"
+    caption = (f"✅ **Processed By @AYU_Bot**\n\n"
                f"**Subtitle Type:** {'Soft (Toggleable)' if is_soft else 'Hard (Burned-in)'}")
     
     task_id = str(uuid.uuid4())
