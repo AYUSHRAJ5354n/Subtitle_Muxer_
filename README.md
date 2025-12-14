@@ -1,4 +1,4 @@
-# 🎬 Subtitle Muxer Bot
+# 🎬 🪔 Subtitle Muxer Bot
 
 Welcome to **Subtitle_Muxer_Bot** — your all-in-one, powerful automation bot for video and subtitle processing! Built with modern Python and leveraging FFmpeg, this bot makes video file handling, subtitle muxing, and media management easy, efficient, and scalable.
 
